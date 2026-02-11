@@ -66,13 +66,9 @@ button { cursor: pointer; }
   height: 150px;
   border-radius: 50%;
   margin: 20px auto;
-  background: radial-gradient(circle at 30% 30%, #a9c7ff, #6fa0ff);
-  transition: transform linear;
+  transition: transform linear, background .4s;
   box-shadow: 0 0 25px rgba(120,160,255,0.4);
-}
-
-body.dark #breathCircle {
-  background: radial-gradient(circle at 30% 30%, #557cff, #334b99);
+  cursor: pointer;
 }
 
 .logs {
@@ -102,7 +98,6 @@ body.dark .logs {
 <div id="breathCircle"></div>
 
 <!-- Controls -->
-
 <div class="row">
 
 <select id="preset">
@@ -130,12 +125,11 @@ body.dark .logs {
 <button id="startStop">Start</button>
 
 <span class="pill" id="phase">Ready</span>
-<span class="pill" id="timer">00:00</span>
+<span class="pill" id="timer">05:00</span>
 
 </div>
 
 <!-- Cue -->
-
 <div class="big" id="cue" style="margin-top:15px;">
 Equanimity and awareness
 </div>
@@ -148,7 +142,6 @@ Equanimity and awareness
 <hr>
 
 <!-- Gauge -->
-
 <label>Gauge</label>
 <input id="gauge" type="range" min="-5" max="5" value="0">
 
@@ -164,14 +157,11 @@ Equanimity and awareness
 <button id="clearLogs">Clear</button>
 </div>
 
-<!-- Logs -->
-
 <div class="logs" id="logsBox"></div>
 
 <hr>
 
 <!-- Presence -->
-
 <div>
 🌐 Shared Field:
 <strong id="presenceCount">—</strong>
@@ -182,19 +172,15 @@ Equanimity and awareness
 
 <script>
 
-/* ======================
-   CONFIG
-====================== */
+/* CONFIG */
 
 const PRESENCE_BASE =
 "https://coherence-presence-2.lucolly999.workers.dev";
 
-const LOG_KEY = "coh_logs_v2";
+const LOG_KEY = "coh_logs_v3";
 
 
-/* ======================
-   STATE
-====================== */
+/* STATE */
 
 let running=false;
 let startTime=0;
@@ -203,6 +189,10 @@ let tick=null;
 let phase="Ready";
 let sessionSec=300;
 let presenceId=null;
+let colorIndex=0;
+
+
+/* CUES */
 
 const CUES = [
   "Equanimity and awareness",
@@ -215,9 +205,18 @@ const CUES = [
 ];
 
 
-/* ======================
-   UTIL
-====================== */
+/* CIRCLE COLOURS */
+
+const COLORS = [
+  "radial-gradient(circle at 30% 30%, #a9c7ff, #6fa0ff)",
+  "radial-gradient(circle at 30% 30%, #a8ffd6, #4ccf99)",
+  "radial-gradient(circle at 30% 30%, #ffd6a8, #ff9f4c)",
+  "radial-gradient(circle at 30% 30%, #e0b3ff, #9c6cff)",
+  "radial-gradient(circle at 30% 30%, #ffb3c6, #ff5f87)"
+];
+
+
+/* UTIL */
 
 function mmss(s){
   const m=Math.floor(s/60);
@@ -238,9 +237,7 @@ function gaugeText(v){
 }
 
 
-/* ======================
-   LOGS
-====================== */
+/* LOGS */
 
 function loadLogs(){
   try{
@@ -255,7 +252,7 @@ function saveLogs(l){
 }
 
 function renderLogs(){
-  const box=document.getElementById("logsBox");
+  const box=logsBox;
   const logs=loadLogs().slice().reverse();
 
   if(!logs.length){
@@ -263,22 +260,16 @@ function renderLogs(){
     return;
   }
 
-  box.innerHTML=logs.map(e=>{
-    return `
-      <div style="margin-bottom:6px;">
-        <strong>${e.cue}</strong>
-        (${e.g})
-        <br>
-        <span>${e.n||""}</span>
-      </div>
-    `;
-  }).join("");
+  box.innerHTML=logs.map(e=>`
+    <div style="margin-bottom:6px;">
+      <strong>${e.cue}</strong> (${e.g})<br>
+      <span>${e.n||""}</span>
+    </div>
+  `).join("");
 }
 
 
-/* ======================
-   PRESENCE
-====================== */
+/* PRESENCE */
 
 function updatePresence(){
   fetch(PRESENCE_BASE+"/presence/count")
@@ -305,14 +296,12 @@ function leavePresence(){
 }
 
 
-/* ======================
-   BREATHING
-====================== */
+/* BREATHING */
 
 function scheduleBreath(){
 
-  const inSec=+inSecInput.value;
-  const outSec=+outSecInput.value;
+  const inSec=+inSec.value;
+  const outSec=+outSec.value;
   const circle=breathCircle;
 
   if(phase==="Ready"||phase==="Out"){
@@ -322,6 +311,7 @@ function scheduleBreath(){
 
     circle.style.transition=
       `transform ${inSec}s linear`;
+
     circle.style.transform="scale(1.4)";
 
     haptic(15);
@@ -337,6 +327,7 @@ function scheduleBreath(){
 
     circle.style.transition=
       `transform ${outSec}s linear`;
+
     circle.style.transform="scale(1)";
 
     haptic(30);
@@ -348,9 +339,7 @@ function scheduleBreath(){
 }
 
 
-/* ======================
-   SESSION
-====================== */
+/* SESSION */
 
 function start(){
 
@@ -365,12 +354,15 @@ function start(){
 
   tick=setInterval(()=>{
 
-    const e=
+    const elapsed=
       Math.floor((Date.now()-startTime)/1000);
 
-    timer.textContent=mmss(e);
+    const remain=
+      Math.max(0,sessionSec-elapsed);
 
-    if(e>=sessionSec){
+    timer.textContent=mmss(remain);
+
+    if(remain<=0){
       stop();
       bell();
     }
@@ -392,9 +384,7 @@ function stop(){
 }
 
 
-/* ======================
-   BELL
-====================== */
+/* BELL */
 
 function bell(){
 
@@ -418,12 +408,7 @@ function bell(){
 }
 
 
-/* ======================
-   UI
-====================== */
-
-const inSecInput=inSec;
-const outSecInput=outSec;
+/* UI */
 
 startStop.onclick=()=>{
   running?stop():start();
@@ -474,9 +459,20 @@ clearLogs.onclick=()=>{
 };
 
 
-/* ======================
-   STARTUP
-====================== */
+/* CIRCLE COLOUR */
+
+breathCircle.onclick=()=>{
+
+  colorIndex=(colorIndex+1)%COLORS.length;
+
+  breathCircle.style.background=
+    COLORS[colorIndex];
+};
+
+
+/* STARTUP */
+
+breathCircle.style.background=COLORS[0];
 
 renderLogs();
 joinPresence();
