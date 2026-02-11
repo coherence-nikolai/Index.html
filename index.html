@@ -21,7 +21,6 @@
     .logs { max-height: 280px; overflow: auto; background: #fafafa; }
     .pill { display: inline-block; padding: 6px 10px; border: 1px solid #ddd; border-radius: 999px; margin-right: 8px; }
 
-    /* Intro overlay */
     .overlay {
       position: fixed; inset: 0;
       background: rgba(0,0,0,0.55);
@@ -45,10 +44,10 @@
 </head>
 <body>
   <h1>Coherence</h1>
-  <div class="muted">Reset • Steer • Reflect (v1: local-only)</div>
+  <div class="muted">Reset • Steer • Reflect</div>
 
-  <!-- One-time intro -->
-  <div class="overlay" id="introOverlay" aria-hidden="true">
+  <!-- Intro -->
+  <div class="overlay" id="introOverlay">
     <div class="panel">
       <h2>Coherence</h2>
       <p><strong>A place to return to coherence.</strong></p>
@@ -59,353 +58,194 @@
     </div>
   </div>
 
+  <!-- Why -->
+  <div class="overlay" id="whyOverlay">
+    <div class="panel">
+      <h2>Why this works</h2>
+      <p>
+        Breathing out longer than you breathe in activates the vagal nerve — the part
+        of your nervous system that helps you feel safe and settled.
+      </p>
+      <p>
+        This allows your body to relax and your mind to become clearer.
+      </p>
+      <div class="row" style="justify-content: flex-end; margin-top: 12px;">
+        <button class="primary" id="whyClose">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="row">
       <div>
-        <label for="stream">Stream</label><br/>
+        <label>Stream</label><br/>
         <select id="stream">
-          <option value="Equanimity">Equanimity</option>
-          <option value="Joy">Joy</option>
-          <option value="Reverence">Reverence</option>
-          <option value="Metta">Metta</option>
-          <option value="Radiance">Radiance</option>
-          <option value="Custom">Custom</option>
+          <option>Equanimity</option>
+          <option>Joy</option>
+          <option>Reverence</option>
+          <option>Metta</option>
+          <option>Radiance</option>
+          <option>Custom</option>
         </select>
       </div>
 
-      <div style="flex: 1; min-width: 240px;">
-        <label for="customStream">Custom label</label><br/>
-        <input id="customStream" placeholder="e.g., Steady / Match this" />
+      <div style="flex:1; min-width:240px;">
+        <label>Custom label</label><br/>
+        <input id="customStream" />
       </div>
     </div>
 
-    <div style="height: 12px;"></div>
-
     <div class="grid2">
+
       <div>
-        <label>Breath cadence (seconds)</label>
+        <label>Breath (4–6 calming)</label>
+
         <div class="row">
-          <div>
-            <div class="muted">In</div>
-            <input id="inSec" type="number" min="1" max="20" value="4" style="width: 90px;" />
-          </div>
-          <div>
-            <div class="muted">Hold</div>
-            <input id="holdSec" type="number" min="0" max="20" value="0" style="width: 90px;" />
-          </div>
-          <div>
-            <div class="muted">Out</div>
-            <input id="outSec" type="number" min="1" max="30" value="6" style="width: 90px;" />
-          </div>
+          <input id="inSec" type="number" value="4" style="width:80px;">
+          <input id="outSec" type="number" value="6" style="width:80px;">
         </div>
 
-        <div style="height: 10px;"></div>
+        <div class="row" style="margin-top:6px;">
+          <button id="whyBtn">Why this works</button>
+        </div>
 
-        <div class="row">
+        <div class="row" style="margin-top:10px;">
           <button class="primary" id="startStop">Start</button>
-          <button id="reset">Reset</button>
           <span class="pill mono" id="timer">00:00</span>
           <span class="pill" id="phase">Ready</span>
         </div>
 
-        <div style="height: 10px;"></div>
-
-        <div class="big" id="cueLine"></div>
-        <div class="muted">Tap “New cue” to rotate phrases.</div>
-        <div style="height: 10px;"></div>
-        <button id="newCue">New cue</button>
+        <div style="margin-top:10px;">
+          <div class="big" id="cueLine"></div>
+          <button id="newCue">New cue</button>
+        </div>
       </div>
 
       <div>
-        <label for="gauge">Gauge (contraction ↔ expansion)</label><br/>
-        <input id="gauge" type="range" min="-5" max="5" value="0" style="width: 100%;" />
+        <label>Gauge</label>
+        <input id="gauge" type="range" min="-5" max="5" value="0">
+
         <div class="row">
-          <span class="mono" id="gaugeVal">0</span>
+          <span id="gaugeVal">0</span>
           <span class="muted" id="gaugeLabel">Neutral</span>
         </div>
 
-        <div style="height: 10px;"></div>
+        <textarea id="note" rows="4" placeholder="One line..."></textarea>
 
-        <label for="note">Note (optional)</label><br/>
-        <textarea id="note" rows="5" style="width: 100%;" placeholder="One line. Tone-first."></textarea>
-
-        <div style="height: 10px;"></div>
         <div class="row">
-          <button class="primary" id="saveLog">Log this moment</button>
-          <button id="clearAll">Clear all logs</button>
+          <button class="primary" id="saveLog">Log</button>
+          <button id="clearAll">Clear</button>
         </div>
       </div>
-    </div>
-  </div>
 
-  <div class="card">
-    <div class="row" style="justify-content: space-between;">
-      <div>
-        <label>Logs</label>
-        <div class="muted">Stored locally in your browser.</div>
-      </div>
-      <div class="row">
-        <button id="exportJson">Export JSON</button>
-      </div>
     </div>
-
-    <div class="card logs" id="logList"></div>
   </div>
 
 <script>
 (() => {
-  const DEFAULT_CUE = "Equanimity and awareness";
-  const INTRO_SEEN_KEY = "coherence_intro_seen_v1_1";
-  const STORAGE_KEY = "coherence_logs_v1";
 
-  const CUES = [
-    "Equanimity and awareness",
-    "Steady",
-    "Match this",
-    "Soft eyes, wide field",
-    "Upper-lip breath",
-    "Release the grasp",
-    "Let it pass through",
-    "Tone first",
-    "Gentle attention",
-    "Reverence",
-    "Joy",
-    "Metta"
-  ];
+const DEFAULT_CUE = "Equanimity and awareness";
+const INTRO_KEY = "coh_intro_v1";
+const LOG_KEY = "coh_logs";
 
-  const els = {
-    stream: document.getElementById("stream"),
-    customStream: document.getElementById("customStream"),
-    inSec: document.getElementById("inSec"),
-    holdSec: document.getElementById("holdSec"),
-    outSec: document.getElementById("outSec"),
-    startStop: document.getElementById("startStop"),
-    reset: document.getElementById("reset"),
-    timer: document.getElementById("timer"),
-    phase: document.getElementById("phase"),
-    cueLine: document.getElementById("cueLine"),
-    newCue: document.getElementById("newCue"),
-    gauge: document.getElementById("gauge"),
-    gaugeVal: document.getElementById("gaugeVal"),
-    gaugeLabel: document.getElementById("gaugeLabel"),
-    note: document.getElementById("note"),
-    saveLog: document.getElementById("saveLog"),
-    clearAll: document.getElementById("clearAll"),
-    logList: document.getElementById("logList"),
-    exportJson: document.getElementById("exportJson"),
-    introOverlay: document.getElementById("introOverlay"),
-    introStart: document.getElementById("introStart")
-  };
+const CUES = [
+  DEFAULT_CUE,"Steady","Match this","Soft eyes","Release","Tone first","Gentle","Reverence","Joy","Metta"
+];
 
-  let running = false;
-  let tickHandle = null;
-  let startEpochMs = null;
-  let phasePlan = [];
-  let phaseIndex = 0;
-  let phaseRemaining = 0;
+const $ = id => document.getElementById(id);
 
-  function nowIso() { return new Date().toISOString(); }
-  function pad2(n) { return String(n).padStart(2, "0"); }
-  function fmtMMSS(totalSec) {
-    const m = Math.floor(totalSec / 60);
-    const s = totalSec % 60;
-    return `${pad2(m)}:${pad2(s)}`;
-  }
+let running=false, timer=null, start=0, phase="In";
 
-  function currentStreamLabel() {
-    const s = els.stream.value;
-    if (s === "Custom") {
-      const c = (els.customStream.value || "").trim();
-      return c.length ? c : "Custom";
-    }
-    return s;
-  }
+function mmss(s){
+  const m=Math.floor(s/60), r=s%60;
+  return String(m).padStart(2,"0")+":"+String(r).padStart(2,"0");
+}
 
-  function gaugeText(v) {
-    if (v <= -3) return "Contracted";
-    if (v < 0) return "Tight";
-    if (v === 0) return "Neutral";
-    if (v < 3) return "Open";
-    return "Expanded";
-  }
+function gaugeText(v){
+  if(v<-2) return "Tight";
+  if(v>2) return "Open";
+  return "Neutral";
+}
 
-  function loadLogs() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return [];
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : [];
-    } catch {
-      return [];
-    }
-  }
+function load(){
+  try{ return JSON.parse(localStorage.getItem(LOG_KEY))||[] }
+  catch{ return [] }
+}
 
-  function saveLogs(logs) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(logs));
-  }
+function save(x){
+  localStorage.setItem(LOG_KEY,JSON.stringify(x));
+}
 
-  function renderLogs() {
-    const logs = loadLogs().slice().reverse();
-    if (!logs.length) {
-      els.logList.innerHTML = `<div class="muted">No logs yet.</div>`;
-      return;
-    }
-    els.logList.innerHTML = logs.map(x => {
-      const note = (x.note || "").replaceAll("<","&lt;").replaceAll(">","&gt;");
-      return `
-        <div style="padding: 10px; border-bottom: 1px solid #eee;">
-          <div><span class="pill">${x.stream}</span><span class="pill mono">${x.gauge}</span><span class="pill">${x.gaugeLabel}</span></div>
-          <div class="muted mono" style="margin-top: 6px;">${x.time}</div>
-          ${note ? `<div style="margin-top: 6px;">${note}</div>` : ""}
-        </div>
-      `;
-    }).join("");
-  }
+function startTimer(){
+  if(running) return;
+  running=true;
+  start=Date.now();
+  phase="In";
+  $("startStop").textContent="Stop";
 
-  function setCue(text) {
-    els.cueLine.textContent = text;
-  }
+  timer=setInterval(()=>{
+    const s=Math.floor((Date.now()-start)/1000);
+    $("timer").textContent=mmss(s);
+  },1000);
+}
 
-  function pickCue() {
-    const idx = Math.floor(Math.random() * CUES.length);
-    setCue(CUES[idx]);
-  }
+function stopTimer(){
+  running=false;
+  clearInterval(timer);
+  $("startStop").textContent="Start";
+}
 
-  function beep() {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)();
-      const o = ctx.createOscillator();
-      const g = ctx.createGain();
-      o.connect(g); g.connect(ctx.destination);
-      o.type = "sine";
-      o.frequency.value = 660;
-      g.gain.value = 0.03;
-      o.start();
-      setTimeout(() => { o.stop(); ctx.close(); }, 80);
-    } catch {}
-  }
+$("startStop").onclick=()=>running?stopTimer():startTimer();
 
-  function buildPhasePlan() {
-    const inS = Math.max(1, Math.min(20, Number(els.inSec.value) || 4));
-    const holdS = Math.max(0, Math.min(20, Number(els.holdSec.value) || 0));
-    const outS = Math.max(1, Math.min(30, Number(els.outSec.value) || 6));
-    return [
-      { name: "In", sec: inS },
-      ...(holdS > 0 ? [{ name: "Hold", sec: holdS }] : []),
-      { name: "Out", sec: outS }
-    ];
-  }
+$("newCue").onclick=()=>{
+  $("cueLine").textContent=CUES[Math.floor(Math.random()*CUES.length)];
+};
 
-  function setPhase(i) {
-    phaseIndex = i % phasePlan.length;
-    phaseRemaining = phasePlan[phaseIndex].sec;
-    els.phase.textContent = phasePlan[phaseIndex].name;
-    beep();
-  }
+$("gauge").oninput=e=>{
+  $("gaugeVal").textContent=e.target.value;
+  $("gaugeLabel").textContent=gaugeText(+e.target.value);
+};
 
-  function start() {
-    if (running) return;
-    running = true;
-    els.startStop.textContent = "Stop";
-    phasePlan = buildPhasePlan();
-    startEpochMs = Date.now();
-    setPhase(0);
-
-    tickHandle = setInterval(() => {
-      const elapsedSec = Math.floor((Date.now() - startEpochMs) / 1000);
-      els.timer.textContent = fmtMMSS(elapsedSec);
-
-      phaseRemaining -= 1;
-      if (phaseRemaining <= 0) setPhase(phaseIndex + 1);
-    }, 1000);
-  }
-
-  function stop() {
-    running = false;
-    els.startStop.textContent = "Start";
-    if (tickHandle) clearInterval(tickHandle);
-    tickHandle = null;
-    els.phase.textContent = "Stopped";
-  }
-
-  function resetTimer() {
-    stop();
-    startEpochMs = null;
-    els.timer.textContent = "00:00";
-    els.phase.textContent = "Ready";
-  }
-
-  function showIntroIfNeeded() {
-    const seen = localStorage.getItem(INTRO_SEEN_KEY);
-    if (seen === "1") return;
-    els.introOverlay.style.display = "flex";
-    els.introOverlay.setAttribute("aria-hidden", "false");
-  }
-
-  function hideIntro() {
-    localStorage.setItem(INTRO_SEEN_KEY, "1");
-    els.introOverlay.style.display = "none";
-    els.introOverlay.setAttribute("aria-hidden", "true");
-  }
-
-  // Wire UI
-  els.newCue.addEventListener("click", pickCue);
-
-  els.gauge.addEventListener("input", () => {
-    const v = Number(els.gauge.value);
-    els.gaugeVal.textContent = String(v);
-    els.gaugeLabel.textContent = gaugeText(v);
+$("saveLog").onclick=()=>{
+  const l=load();
+  l.push({
+    t:new Date().toISOString(),
+    cue:$("cueLine").textContent,
+    g:$("gauge").value,
+    n:$("note").value
   });
+  save(l);
+  $("note").value="";
+};
 
-  els.startStop.addEventListener("click", () => (!running ? start() : stop()));
-  els.reset.addEventListener("click", resetTimer);
+$("clearAll").onclick=()=>{
+  localStorage.removeItem(LOG_KEY);
+};
 
-  els.saveLog.addEventListener("click", () => {
-    const logs = loadLogs();
-    const v = Number(els.gauge.value);
-    logs.push({
-      time: nowIso(),
-      stream: currentStreamLabel(),
-      cue: els.cueLine.textContent,
-      gauge: v,
-      gaugeLabel: gaugeText(v),
-      note: (els.note.value || "").trim(),
-      cadence: {
-        in: Number(els.inSec.value) || 4,
-        hold: Number(els.holdSec.value) || 0,
-        out: Number(els.outSec.value) || 6
-      }
-    });
-    saveLogs(logs);
-    els.note.value = "";
-    renderLogs();
-  });
+$("whyBtn").onclick=()=>{
+  $("whyOverlay").style.display="flex";
+};
 
-  els.clearAll.addEventListener("click", () => {
-    localStorage.removeItem(STORAGE_KEY);
-    renderLogs();
-  });
+$("whyClose").onclick=()=>{
+  $("whyOverlay").style.display="none";
+};
 
-  els.exportJson.addEventListener("click", () => {
-    const logs = loadLogs();
-    const blob = new Blob([JSON.stringify(logs, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "coherence_logs.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  });
+$("introStart").onclick=()=>{
+  localStorage.setItem(INTRO_KEY,"1");
+  $("introOverlay").style.display="none";
+};
 
-  els.introStart.addEventListener("click", hideIntro);
+function init(){
+  $("cueLine").textContent=DEFAULT_CUE;
+  $("gauge").dispatchEvent(new Event("input"));
 
-  // Init
-  setCue(DEFAULT_CUE);                 // no random cue on launch
-  els.gauge.dispatchEvent(new Event("input"));
-  renderLogs();
-  showIntroIfNeeded();
+  if(!localStorage.getItem(INTRO_KEY)){
+    $("introOverlay").style.display="flex";
+  }
+}
+
+init();
+
 })();
 </script>
 </body>
