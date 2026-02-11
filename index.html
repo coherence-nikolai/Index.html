@@ -48,12 +48,10 @@ button, select, input, textarea {
   font-size: 16px;
 }
 
-button {
-  cursor: pointer;
-}
+button { cursor: pointer; }
 
 .big {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
 }
 
@@ -76,17 +74,34 @@ button {
 body.dark #breathCircle {
   background: radial-gradient(circle at 30% 30%, #557cff, #334b99);
 }
+
+.logs {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 8px;
+  background: #fafafa;
+  font-size: 14px;
+}
+
+body.dark .logs {
+  background: #222;
+  border-color: #444;
+}
 </style>
 </head>
 
 <body>
 
 <h1>Coherence</h1>
-<div class="muted">Reset • Steer • Reflect</div>
+<div>Reset • Steer • Reflect</div>
 
 <div class="card">
 
 <div id="breathCircle"></div>
+
+<!-- Controls -->
 
 <div class="row">
 
@@ -98,8 +113,8 @@ body.dark #breathCircle {
   <option value="custom">Custom</option>
 </select>
 
-<input id="inSec" type="number" value="4" style="width:80px;">
-<input id="outSec" type="number" value="6" style="width:80px;">
+<input id="inSec" type="number" value="4" style="width:70px;">
+<input id="outSec" type="number" value="6" style="width:70px;">
 
 <select id="duration">
   <option value="1">1m</option>
@@ -119,22 +134,47 @@ body.dark #breathCircle {
 
 </div>
 
+<!-- Cue -->
+
 <div class="big" id="cue" style="margin-top:15px;">
 Equanimity and awareness
 </div>
 
 <div class="row" style="margin-top:10px;">
-
 <button id="newCue">New cue</button>
-<button id="darkToggle">Dark mode</button>
-
+<button id="darkToggle">Dark</button>
 </div>
 
 <hr>
 
+<!-- Gauge -->
+
+<label>Gauge</label>
+<input id="gauge" type="range" min="-5" max="5" value="0">
+
+<div class="row">
+<span id="gaugeVal">0</span>
+<span id="gaugeLabel">Neutral</span>
+</div>
+
+<textarea id="note" rows="2" placeholder="One line note..."></textarea>
+
+<div class="row">
+<button id="saveLog">Log</button>
+<button id="clearLogs">Clear</button>
+</div>
+
+<!-- Logs -->
+
+<div class="logs" id="logsBox"></div>
+
+<hr>
+
+<!-- Presence -->
+
 <div>
 🌐 Shared Field:
-<span id="presenceCount">—</span>
+<strong id="presenceCount">—</strong>
 </div>
 
 </div>
@@ -142,23 +182,27 @@ Equanimity and awareness
 
 <script>
 
-/* ================================
-   Cloudflare Worker URL
-   ================================ */
+/* ======================
+   CONFIG
+====================== */
 
 const PRESENCE_BASE =
-  "https://coherence-presence-2.lucolly999.workers.dev";
+"https://coherence-presence-2.lucolly999.workers.dev";
+
+const LOG_KEY = "coh_logs_v2";
 
 
-/* ================================ */
+/* ======================
+   STATE
+====================== */
 
-let running = false;
-let startTime = 0;
-let breathTimer = null;
-let tick = null;
-let phase = "Ready";
-let sessionSec = 300;
-let presenceId = null;
+let running=false;
+let startTime=0;
+let breathTimer=null;
+let tick=null;
+let phase="Ready";
+let sessionSec=300;
+let presenceId=null;
 
 const CUES = [
   "Equanimity and awareness",
@@ -170,198 +214,277 @@ const CUES = [
   "Metta"
 ];
 
-function haptic(type="light"){
-  if (navigator.vibrate){
-    navigator.vibrate(type==="strong" ? 40 : 15);
+
+/* ======================
+   UTIL
+====================== */
+
+function mmss(s){
+  const m=Math.floor(s/60);
+  const r=s%60;
+  return String(m).padStart(2,"0")+":"+String(r).padStart(2,"0");
+}
+
+function haptic(ms=15){
+  if(navigator.vibrate){
+    navigator.vibrate(ms);
   }
 }
 
-function mmss(s){
-  const m = Math.floor(s/60);
-  const r = s % 60;
-  return String(m).padStart(2,"0") + ":" + String(r).padStart(2,"0");
+function gaugeText(v){
+  if(v<-2) return "Tight";
+  if(v>2) return "Open";
+  return "Neutral";
 }
 
 
-/* ===== Presence ===== */
+/* ======================
+   LOGS
+====================== */
+
+function loadLogs(){
+  try{
+    return JSON.parse(localStorage.getItem(LOG_KEY))||[];
+  }catch{
+    return [];
+  }
+}
+
+function saveLogs(l){
+  localStorage.setItem(LOG_KEY,JSON.stringify(l));
+}
+
+function renderLogs(){
+  const box=document.getElementById("logsBox");
+  const logs=loadLogs().slice().reverse();
+
+  if(!logs.length){
+    box.innerHTML="<em>No logs yet</em>";
+    return;
+  }
+
+  box.innerHTML=logs.map(e=>{
+    return `
+      <div style="margin-bottom:6px;">
+        <strong>${e.cue}</strong>
+        (${e.g})
+        <br>
+        <span>${e.n||""}</span>
+      </div>
+    `;
+  }).join("");
+}
+
+
+/* ======================
+   PRESENCE
+====================== */
 
 function updatePresence(){
-  fetch(PRESENCE_BASE + "/presence/count")
-    .then(r => r.json())
-    .then(j => {
-      document.getElementById("presenceCount").textContent = j.count;
-    })
-    .catch(()=>{});
+  fetch(PRESENCE_BASE+"/presence/count")
+  .then(r=>r.json())
+  .then(j=>{
+    presenceCount.textContent=j.count;
+  }).catch(()=>{});
 }
 
 function joinPresence(){
-  fetch(PRESENCE_BASE + "/presence/join")
-    .then(r => r.json())
-    .then(j => {
-      presenceId = j.id;
-      updatePresence();
-    });
+  fetch(PRESENCE_BASE+"/presence/join")
+  .then(r=>r.json())
+  .then(j=>{
+    presenceId=j.id;
+    updatePresence();
+  });
 }
 
 function leavePresence(){
-  if (!presenceId) return;
+  if(!presenceId) return;
   navigator.sendBeacon(
-    PRESENCE_BASE + "/presence/leave?id=" + presenceId
+    PRESENCE_BASE+"/presence/leave?id="+presenceId
   );
 }
 
 
-/* ===== Breathing ===== */
+/* ======================
+   BREATHING
+====================== */
 
 function scheduleBreath(){
 
-  const inSec =
-    parseInt(document.getElementById("inSec").value);
+  const inSec=+inSecInput.value;
+  const outSec=+outSecInput.value;
+  const circle=breathCircle;
 
-  const outSec =
-    parseInt(document.getElementById("outSec").value);
+  if(phase==="Ready"||phase==="Out"){
 
-  const circle =
-    document.getElementById("breathCircle");
+    phase="In";
+    phaseEl.textContent="Inhale";
 
-  if (phase==="Ready" || phase==="Out"){
-
-    phase = "In";
-    document.getElementById("phase").textContent = "Inhale";
-
-    circle.style.transition =
+    circle.style.transition=
       `transform ${inSec}s linear`;
+    circle.style.transform="scale(1.4)";
 
-    circle.style.transform = "scale(1.4)";
+    haptic(15);
 
-    haptic("light");
+    breathTimer=setTimeout(
+      scheduleBreath,inSec*1000
+    );
 
-    breathTimer =
-      setTimeout(scheduleBreath, inSec*1000);
+  }else{
 
-  } else {
+    phase="Out";
+    phaseEl.textContent="Exhale";
 
-    phase = "Out";
-    document.getElementById("phase").textContent = "Exhale";
-
-    circle.style.transition =
+    circle.style.transition=
       `transform ${outSec}s linear`;
+    circle.style.transform="scale(1)";
 
-    circle.style.transform = "scale(1)";
+    haptic(30);
 
-    haptic("strong");
-
-    breathTimer =
-      setTimeout(scheduleBreath, outSec*1000);
+    breathTimer=setTimeout(
+      scheduleBreath,outSec*1000
+    );
   }
 }
 
 
-/* ===== Session ===== */
+/* ======================
+   SESSION
+====================== */
 
 function start(){
 
-  if (running) return;
+  if(running) return;
 
-  running = true;
-  startTime = Date.now();
+  running=true;
+  startTime=Date.now();
 
-  sessionSec =
-    parseInt(document.getElementById("duration").value) * 60;
+  sessionSec=+duration.value*60;
 
   scheduleBreath();
 
-  tick = setInterval(()=>{
+  tick=setInterval(()=>{
 
-    const elapsed =
+    const e=
       Math.floor((Date.now()-startTime)/1000);
 
-    document.getElementById("timer").textContent =
-      mmss(elapsed);
+    timer.textContent=mmss(e);
 
-    if (elapsed >= sessionSec){
+    if(e>=sessionSec){
       stop();
       bell();
     }
 
-  }, 500);
+  },500);
 }
 
 function stop(){
 
-  running = false;
+  running=false;
 
   clearTimeout(breathTimer);
   clearInterval(tick);
 
-  document.getElementById("phase").textContent = "Ready";
-  document.getElementById("breathCircle").style.transform =
-    "scale(1)";
+  phase="Ready";
+  phaseEl.textContent="Ready";
+
+  breathCircle.style.transform="scale(1)";
 }
 
 
-/* ===== Bell ===== */
+/* ======================
+   BELL
+====================== */
 
 function bell(){
 
-  const ctx =
-    new (window.AudioContext||window.webkitAudioContext)();
+  const ctx=new (window.AudioContext||
+    window.webkitAudioContext)();
 
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
+  const o=ctx.createOscillator();
+  const g=ctx.createGain();
 
-  o.type = "sine";
-  o.frequency.value = 432;
-
+  o.frequency.value=432;
   o.connect(g);
   g.connect(ctx.destination);
 
   o.start();
 
   g.gain.exponentialRampToValueAtTime(
-    0.0001,
-    ctx.currentTime+1
+    0.0001,ctx.currentTime+1
   );
 
   o.stop(ctx.currentTime+1);
 }
 
 
-/* ===== UI ===== */
+/* ======================
+   UI
+====================== */
 
-document.getElementById("startStop").onclick = ()=>{
-  running ? stop() : start();
+const inSecInput=inSec;
+const outSecInput=outSec;
+
+startStop.onclick=()=>{
+  running?stop():start();
 };
 
-document.getElementById("newCue").onclick = ()=>{
-  document.getElementById("cue").textContent =
+newCue.onclick=()=>{
+  cue.textContent=
     CUES[Math.floor(Math.random()*CUES.length)];
 };
 
-document.getElementById("preset").onchange = (e)=>{
+preset.onchange=e=>{
+  const v=e.target.value;
 
-  const v = e.target.value;
-
-  if (v==="calm"){ inSec.value=4; outSec.value=6; }
-  if (v==="focus"){ inSec.value=4; outSec.value=4; }
-  if (v==="sleep"){ inSec.value=4; outSec.value=8; }
-  if (v==="energise"){ inSec.value=6; outSec.value=2; }
-
+  if(v==="calm"){inSec.value=4;outSec.value=6;}
+  if(v==="focus"){inSec.value=4;outSec.value=4;}
+  if(v==="sleep"){inSec.value=4;outSec.value=8;}
+  if(v==="energise"){inSec.value=6;outSec.value=2;}
 };
 
-document.getElementById("darkToggle").onclick = ()=>{
+darkToggle.onclick=()=>{
   document.body.classList.toggle("dark");
 };
 
+gauge.oninput=e=>{
+  gaugeVal.textContent=e.target.value;
+  gaugeLabel.textContent=gaugeText(+e.target.value);
+};
 
-/* ===== Startup ===== */
+saveLog.onclick=()=>{
 
+  const l=loadLogs();
+
+  l.push({
+    t:new Date().toISOString(),
+    cue:cue.textContent,
+    g:gauge.value,
+    n:note.value
+  });
+
+  saveLogs(l);
+  note.value="";
+  renderLogs();
+};
+
+clearLogs.onclick=()=>{
+  localStorage.removeItem(LOG_KEY);
+  renderLogs();
+};
+
+
+/* ======================
+   STARTUP
+====================== */
+
+renderLogs();
 joinPresence();
 updatePresence();
 
-setInterval(updatePresence, 10000);
+setInterval(updatePresence,10000);
 
-window.addEventListener("beforeunload", leavePresence);
+window.addEventListener("beforeunload",leavePresence);
 
 </script>
 </body>
