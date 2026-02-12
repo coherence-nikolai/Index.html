@@ -298,6 +298,10 @@
   #scoreRing .ring-fill  { fill:none; stroke:var(--accent); stroke-width:3; stroke-linecap:round;
     stroke-dasharray:565; stroke-dashoffset:565;
     transition: stroke-dashoffset 1s ease; }
+  /* Orion minimal: hide coherence score UI (ring + % pill) */
+  #scoreRing { display:none !important; }
+  #scorePill { display:none !important; }
+
 
   .status-row {
     display:flex; align-items:center; justify-content:center;
@@ -732,7 +736,20 @@
     position:fixed; inset:0; pointer-events:none; z-index:0;
     opacity:0; transition: opacity 3s ease, background 8s ease;
   }
-  </style>
+  
+/* Orion: larger field header + gentle linger then fade */
+#fieldHeader,
+.field-header{
+  font-size: 2.6rem;
+  font-weight: 300;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  opacity: 0.8;
+  transition: opacity 1.6s ease 0.8s; /* fade after 0.8s delay */
+  margin-bottom: 14px;
+}
+
+</style>
 </head>
 <body>
 
@@ -853,7 +870,7 @@
     <div class="status-row">
       <div class="pill" id="phasePill"><span class="dot"></span> Ready</div>
       <div class="pill" id="timerPill">00:00</div>
-      <div class="pill" id="scorePill">
+      <div class="pill" id="scorePill" aria-hidden="true">
         <span class="coherence-badge">— %</span>
       </div>
     </div>
@@ -1609,11 +1626,15 @@ function getCoherenceScore() {
 }
 function updateCoherenceScore() {
   const s = getCoherenceScore();
-  scorePill.innerHTML = `<span class="coherence-badge">${s}%</span>`;
+  if (scorePill) {
+    scorePill.innerHTML = `<span class="coherence-badge">${s}%</span>`;
+    scorePill.classList.toggle('active', s > 50);
+  }
   // update score ring (circumference = 2π*90 ≈ 565)
-  const offset = 565 - (565 * s / 100);
-  ringFill.style.strokeDashoffset = offset;
-  scorePill.classList.toggle('active', s > 50);
+  if (ringFill) {
+    const offset = 565 - (565 * s / 100);
+    ringFill.style.strokeDashoffset = offset;
+  }
 }
 
 /* ═══════════════════════════════════════════
@@ -2066,6 +2087,24 @@ function init() {
 
 init();
 })();
+</script>
+<script>
+
+// Orion: ensure field header fades after start
+(function(){
+  const fh = document.getElementById('fieldHeader') || document.querySelector('.field-header');
+  if(!fh) return;
+  const startBtn = document.getElementById('startBtn') || document.querySelector('.start-btn');
+  if(!startBtn) return;
+
+  startBtn.addEventListener('click', ()=>{
+    // trigger fade via opacity transition
+    requestAnimationFrame(()=>{
+      fh.style.opacity = '0';
+    });
+  });
+})();
+
 </script>
 </body>
 </html>
