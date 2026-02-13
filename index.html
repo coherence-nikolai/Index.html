@@ -16,7 +16,6 @@
       --border-h:rgba(255,255,255,.13);
       --text:#dde8f0;
       --text-dim:#607587;
-      --text-muted:#334455;
       --accent:#78f0b1;
       --accent-dim:rgba(120,240,177,.10);
       --accent-glow:rgba(120,240,177,.28);
@@ -53,6 +52,7 @@
       margin:0 auto;
       padding:28px 18px 70px;
       text-align:center;
+ Awareness.
     }
 
     .field{
@@ -97,7 +97,7 @@
       user-select:none;
       position:relative;
       transform:scale(1);
-      will-change: transform, filter;
+      will-change: transform;
     }
 
     .phase{
@@ -121,11 +121,21 @@
       font-family:var(--font-d);
       font-size:26px;
       line-height:1.15;
-      margin:12px 0 10px;
+      margin:12px 0 6px;
       min-height:34px;
       transition: opacity .25s ease;
     }
     .cue.fade{opacity:0;}
+
+    .field-line{
+      margin: 4px 0 14px;
+      font-size: 12px;
+      letter-spacing: .08em;
+      text-transform: lowercase;
+      color: rgba(221,232,240,.72);
+      opacity: .75;
+      user-select: none;
+    }
 
     .row{
       display:flex;
@@ -138,7 +148,7 @@
     .chip{
       appearance:none;
       border:1px solid var(--border);
-      background:rgba(0,0,0,0);
+      background:transparent;
       color:var(--text-dim);
       border-radius:999px;
       padding:7px 14px;
@@ -191,19 +201,6 @@
     }
     .btn.ghost:hover{border-color:var(--border-h); color:var(--text);}
 
-    .note{
-      margin-top:14px;
-      background:rgba(120,240,177,.08);
-      border:1px solid rgba(120,240,177,.14);
-      border-radius:var(--r-sm);
-      padding:10px 12px;
-      font-size:12px;
-      color:var(--text-dim);
-      line-height:1.55;
-      text-align:left;
-    }
-    .note strong{color:var(--text); font-weight:600;}
-
     .modal{
       position:fixed; inset:0; z-index:10;
       background:rgba(8,15,18,.86);
@@ -241,7 +238,6 @@
       margin-bottom:16px;
     }
 
-    .spacer{height:8px;}
   </style>
 </head>
 <body>
@@ -250,14 +246,14 @@
 
     <div class="card">
       <div class="circle-wrap">
-        <div class="circle" id="circle" aria-label="breath circle" role="button" tabindex="0">
+        <div class="circle" id="circle" tabindex="0">
           <div class="phase">
             <div class="phase-text" id="phaseText">tap to begin</div>
           </div>
         </div>
       </div>
 
-      <div class="row" aria-label="duration">
+      <div class="row">
         <button class="chip" data-min="5" id="d5">5m</button>
         <button class="chip" data-min="10" id="d10">10m</button>
         <button class="chip" data-min="15" id="d15">15m</button>
@@ -265,21 +261,22 @@
 
       <div class="cue" id="cueLine">Equanimity and awareness</div>
 
+      <div class="field-line">
+        The field is shared.
+      </div>
+
       <div class="row">
         <button class="btn ghost" id="changeCue">Change</button>
       </div>
 
-      <div class="spacer"></div>
+      <br>
 
       <button class="btn primary" id="startBtn">Start</button>
 
-      <div class="note" id="note">
-        <strong>The field is shared.</strong> Breathe gently. Let the next breath arrive.
-      </div>
     </div>
   </div>
 
-  <div class="modal" id="doneModal" aria-hidden="true">
+  <div class="modal" id="doneModal">
     <div class="modal-box">
       <div class="modal-title">Session complete</div>
       <div class="modal-body">Stay with the quiet for a moment.</div>
@@ -291,14 +288,8 @@
 (() => {
   'use strict';
 
-  // Single Field rhythm (coherence)
-  const CYCLE_SEC = 11.0; // 5.5 in + 5.5 out
-  const AMP = 0.22;       // big, obvious expansion (A)
-
-  const KEY = {
-    durationMin: 'field_duration_min_v2',
-    cueIdx: 'field_cue_idx_v2'
-  };
+  const CYCLE_SEC = 11.0;
+  const AMP = 0.22;
 
   const CUES = [
     'Equanimity and awareness',
@@ -310,176 +301,133 @@
     'Gentle return'
   ];
 
-  const $ = (id) => document.getElementById(id);
+  const $ = id => document.getElementById(id);
 
   const circle = $('circle');
   const phaseText = $('phaseText');
   const startBtn = $('startBtn');
   const fieldWord = $('fieldWord');
 
-  const dBtns = [ $('d5'), $('d10'), $('d15') ];
+  const dBtns = [$('d5'),$('d10'),$('d15')];
   const cueLine = $('cueLine');
   const changeCue = $('changeCue');
 
   const doneModal = $('doneModal');
   const doneBtn = $('doneBtn');
 
-  let running = false;
-  let totalRemaining = 0;
-  let tick = null;
+  let running=false;
+  let remaining=0;
+  let timer=null;
 
-  let cueIdx = 0;
-  let durationMin = 5;
+  let cueIdx=0;
+  let minutes=5;
 
-  let rafId = null;
-  let startTs = 0;
+  let raf=null;
+  let startTs=0;
 
-  function haptic(ms=10){ try{ if (navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
-
-  function setDuration(min){
-    durationMin = min;
-    localStorage.setItem(KEY.durationMin, String(min));
-    dBtns.forEach(b => b.classList.toggle('active', +b.dataset.min === min));
+  function setDuration(m){
+    minutes=m;
+    dBtns.forEach(b=>b.classList.toggle('active',+b.dataset.min===m));
   }
 
-  function setCue(idx){
-    cueIdx = idx;
-    localStorage.setItem(KEY.cueIdx, String(idx));
-    cueLine.textContent = CUES[idx] || CUES[0];
+  function setCue(i){
+    cueIdx=i;
+    cueLine.textContent=CUES[i];
   }
 
-  function fadeFieldOut(){
-    fieldWord.style.opacity = '0';
+  function fadeField(){
+    fieldWord.style.opacity='0';
   }
 
   function showField(){
-    fieldWord.style.transition = 'opacity 0.8s ease';
-    fieldWord.style.opacity = '.92';
-    setTimeout(() => {
-      fieldWord.style.transition = 'opacity 1.8s ease 0.8s';
-    }, 850);
+    fieldWord.style.opacity='.92';
   }
 
-  function startWave(){
-    if (rafId) return;
-    startTs = performance.now();
+  function wave(){
+    if(raf) return;
+    startTs=performance.now();
 
-    const step = (now) => {
-      if (!running) { rafId = null; return; }
+    const step=(t)=>{
+      if(!running){raf=null;return;}
+      const s=(t-startTs)/1000;
+      const p=(s/CYCLE_SEC)*Math.PI*2;
 
-      const t = (now - startTs) / 1000;
-      const phase = (t / CYCLE_SEC) * Math.PI * 2;
+      const scale=1-AMP*Math.cos(p);
+      circle.style.transform='scale('+scale+')';
 
-      // Smooth wave: min -> max -> min with no edges
-      // scale = 1 - AMP*cos(phase) gives:
-      // phase 0: scale = 1-AMP (small), phase pi: scale = 1+AMP (large)
-      const scale = 1 - AMP * Math.cos(phase);
-      circle.style.transform = 'scale(' + scale.toFixed(4) + ')';
+      phaseText.textContent=Math.sin(p)>=0?'inhale':'exhale';
 
-      // Text: inhale while expanding (derivative positive)
-      const expanding = Math.sin(phase) >= 0;
-      phaseText.textContent = expanding ? 'inhale' : 'exhale';
-
-      rafId = requestAnimationFrame(step);
+      raf=requestAnimationFrame(step);
     };
 
-    rafId = requestAnimationFrame(step);
+    raf=requestAnimationFrame(step);
   }
 
   function stopWave(){
-    if (rafId) {
-      cancelAnimationFrame(rafId);
-      rafId = null;
-    }
-    circle.style.transform = 'scale(1)';
-    phaseText.textContent = 'tap to begin';
+    cancelAnimationFrame(raf);
+    raf=null;
+    circle.style.transform='scale(1)';
+    phaseText.textContent='tap to begin';
   }
 
   function start(){
-    running = true;
-    totalRemaining = Math.max(1, durationMin) * 60;
+    running=true;
+    remaining=minutes*60;
 
-    startBtn.textContent = 'Stop';
+    startBtn.textContent='Stop';
     startBtn.classList.add('running');
 
-    fadeFieldOut();
-    startWave();
+    fadeField();
+    wave();
 
-    tick = setInterval(() => {
-      totalRemaining -= 1;
-      if (totalRemaining <= 0){
-        stop(true);
-      }
-    }, 1000);
+    timer=setInterval(()=>{
+      remaining--;
+      if(remaining<=0) stop(true);
+    },1000);
   }
 
-  function stop(completed){
-    running = false;
-    clearInterval(tick);
-    tick = null;
+  function stop(done){
+    running=false;
+    clearInterval(timer);
 
-    startBtn.textContent = 'Start';
+    startBtn.textContent='Start';
     startBtn.classList.remove('running');
 
     stopWave();
     showField();
 
-    if (completed){
-      haptic(35);
+    if(done){
       doneModal.classList.add('visible');
-      doneModal.setAttribute('aria-hidden','false');
     }
   }
 
   function toggle(){
-    if (running) stop(false);
-    else start();
-    haptic(10);
+    running?stop(false):start();
   }
 
-  startBtn.addEventListener('click', toggle);
-  circle.addEventListener('click', () => { if (!running) toggle(); });
+  startBtn.onclick=toggle;
+  circle.onclick=()=>{if(!running)toggle();};
 
-  circle.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      if (!running) toggle();
-    }
+  dBtns.forEach(b=>{
+    b.onclick=()=>{if(!running)setDuration(+b.dataset.min);};
   });
 
-  dBtns.forEach(b => {
-    b.addEventListener('click', () => {
-      if (running) return;
-      setDuration(+b.dataset.min);
-      haptic(8);
-    });
-  });
-
-  changeCue.addEventListener('click', () => {
+  changeCue.onclick=()=>{
     cueLine.classList.add('fade');
-    setTimeout(() => {
-      const next = (cueIdx + 1) % CUES.length;
-      setCue(next);
+    setTimeout(()=>{
+      cueIdx=(cueIdx+1)%CUES.length;
+      setCue(cueIdx);
       cueLine.classList.remove('fade');
-    }, 150);
-    haptic(8);
-  });
+    },150);
+  };
 
-  doneBtn.addEventListener('click', () => {
+  doneBtn.onclick=()=>{
     doneModal.classList.remove('visible');
-    doneModal.setAttribute('aria-hidden','true');
-    haptic(10);
-  });
+  };
 
-  (function init(){
-    const savedDur = +localStorage.getItem(KEY.durationMin);
-    if ([5,10,15].includes(savedDur)) setDuration(savedDur);
-    else setDuration(5);
+  setDuration(5);
+  setCue(0);
 
-    const savedCue = +localStorage.getItem(KEY.cueIdx);
-    if (!Number.isNaN(savedCue) && savedCue >= 0 && savedCue < CUES.length) setCue(savedCue);
-    else setCue(0);
-  })();
 })();
 </script>
 </body>
