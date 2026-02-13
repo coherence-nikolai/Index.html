@@ -244,22 +244,63 @@ function fitIntentText() {
   }
 }
 
+let phase = "INHALE";
+let phaseTimeout = null;
+let phaseInterval = null;
+const CYCLE_MS = 11000;          // must match CSS animation duration
+const HALF_MS = CYCLE_MS / 2;
+
+function clearPhaseTimers() {
+  if (phaseTimeout) {
+    window.clearTimeout(phaseTimeout);
+    phaseTimeout = null;
+  }
+  if (phaseInterval) {
+    window.clearInterval(phaseInterval);
+    phaseInterval = null;
+  }
+}
+
+function startPhaseLoop() {
+  clearPhaseTimers();
+  phase = "INHALE";
+  circle.textContent = phase;
+
+  // After first half-cycle, switch to EXHALE, then toggle every half-cycle.
+  phaseTimeout = window.setTimeout(() => {
+    phase = "EXHALE";
+    circle.textContent = phase;
+
+    phaseInterval = window.setInterval(() => {
+      phase = (phase === "INHALE") ? "EXHALE" : "INHALE";
+      circle.textContent = phase;
+    }, HALF_MS);
+  }, HALF_MS);
+}
+
 function setRunning(next) {
   running = next;
   document.body.classList.toggle("running", running);
 
   if (running) {
+    // Restart the CSS animation so the label stays in sync.
+    circle.classList.remove("breathing");
+    void circle.offsetWidth; // force reflow
     circle.classList.add("breathing");
-    circle.textContent = "EXHALE";
+
+    startPhaseLoop();
+
     toggleBtn.textContent = "Stop";
     toggleBtn.setAttribute("aria-pressed", "true");
   } else {
+    clearPhaseTimers();
     circle.classList.remove("breathing");
     circle.textContent = "TAP TO BEGIN";
     toggleBtn.textContent = "Start";
     toggleBtn.setAttribute("aria-pressed", "false");
   }
 }
+
 
 function toggleSession() {
   setRunning(!running);
