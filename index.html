@@ -1,19 +1,20 @@
 
 <!DOCTYPE html>
+
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>field</title>
-
 <style>
 :root {
-  --bg1: #071516;
+--bg1: #071516;
   --bg2: #0e2423;
   --card: rgba(12, 32, 34, 0.85);
   --mint: #7ef5b5;
   --header: #e6f1ee;
   --soft: rgba(230,241,238,0.7);
+  --circleSize: clamp(220px, 62vw, 290px);
 }
 
 * {
@@ -39,12 +40,28 @@ body {
   text-align: center;
 }
 
-h1 {
-  font-size: 3.6rem;
-  letter-spacing: 0.35em;
-  margin-bottom: 40px;
-  color: var(--header);
-  font-weight: 400;
+h1.wordmark{
+  width: min(var(--circleSize), 86vw);
+  margin: 56px auto 52px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+  font-size: clamp(72px, 12vw, 112px);
+  letter-spacing: 0;
+  color: var(--text);
+  opacity: 1;
+  transition: opacity 650ms ease;
+  user-select: none;
+  pointer-events: none;
+}
+h1.wordmark span{
+  display: block;
+  line-height: 0.9;
+}
+body.running h1.wordmark{
+  opacity: 0;
 }
 
 .card {
@@ -55,8 +72,8 @@ h1 {
 }
 
 .circle {
-  width: 210px;
-  height: 210px;
+  width: var(--circleSize);
+  height: var(--circleSize);
   margin: 0 auto 25px;
   background: radial-gradient(circle at 30% 30%, #9fffcf, var(--mint));
   border-radius: 50%;
@@ -83,12 +100,21 @@ h1 {
 }
 
 .intent {
-  font-size: 2rem;
+  /* Responsive, and JS fitText() will shrink further if needed. */
+  font-size: clamp(18px, 4.8vw, 34px);
   margin: 30px 0 10px;
   cursor: pointer;
   user-select: none;
   color: var(--header);
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease, text-shadow 0.25s ease;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  line-height: 1.15;
+  min-height: 1.4em;
 }
 
 .intent:active {
@@ -151,39 +177,35 @@ button.secondary:disabled {
   100% { text-shadow: 0 0 0 rgba(126,245,181,0.0); }
 }
 
+
+
+#intent{
+  display:block;
+  max-width: 86%;
+  margin: 0 auto;
+  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+}
 </style>
 </head>
-
 <body>
-
 <div class="wrapper">
-
-  <h1>field</h1>
-
-  <div class="card">
-
-    <div id="circle" class="circle">TAP TO BEGIN</div>
-
-    <div id="intent" class="intent" tabindex="0">
+<h1 class="wordmark"><span>f</span><span>i</span><span>e</span><span>l</span><span>d</span></h1>
+<div class="card">
+<div class="circle" id="circle">TAP TO BEGIN</div>
+<div class="intent" id="intent" tabindex="0">
       Equanimity and awareness
     </div>
-
-    <div class="sub">the field is shared.</div>
-
-    <div class="controls">
-      <button id="startBtn">Start</button>
-      <button id="stopBtn" class="secondary" disabled>Stop</button>
-    </div>
-
-  </div>
-
+<div class="sub">the field is shared.</div>
+<div class="controls">
+<button aria-label="Start or stop" class="primary" id="toggleBtn">Start</button>
 </div>
-
+</div>
+</div>
 <script>
-
 const circle = document.getElementById("circle");
-const startBtn = document.getElementById("startBtn");
-const stopBtn = document.getElementById("stopBtn");
+const toggleBtn = document.getElementById("toggleBtn");
 const intentEl = document.getElementById("intent");
 
 let running = false;
@@ -201,24 +223,50 @@ const INTENTIONS = [
   "Receive the breath"
 ];
 
-function startSession() {
-  if (running) return;
+// Fit intention text to one line (no wrapping) by shrinking font-size if needed.
+function fitIntentText() {
+  const maxPx = 44;
+  const minPx = 18;
 
-  running = true;
-  circle.classList.add("breathing");
-  circle.textContent = "EXHALE";
+  // Reset to max first
+  let size = maxPx;
+  intentEl.style.fontSize = size + "px";
 
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
+  // Ensure we have a measurable width
+  // Use the element's rendered width as the constraint.
+  const maxWidth = intentEl.getBoundingClientRect().width || intentEl.clientWidth || intentEl.parentElement?.clientWidth || 0;
+  if (!maxWidth) return;
+
+  // Shrink until it fits (or hits min)
+  while (intentEl.scrollWidth > maxWidth && size > minPx) {
+    size -= 1;
+    intentEl.style.fontSize = size + "px";
+  }
 }
 
-function stopSession() {
-  running = false;
-  circle.classList.remove("breathing");
-  circle.textContent = "TAP TO BEGIN";
+function setRunning(next) {
+  running = next;
+  document.body.classList.toggle("running", running);
 
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
+  if (running) {
+    circle.classList.add("breathing");
+    circle.textContent = "EXHALE";
+    toggleBtn.textContent = "Stop";
+    toggleBtn.setAttribute("aria-pressed", "true");
+  } else {
+    circle.classList.remove("breathing");
+    circle.textContent = "TAP TO BEGIN";
+    toggleBtn.textContent = "Start";
+    toggleBtn.setAttribute("aria-pressed", "false");
+  }
+}
+
+function toggleSession() {
+  setRunning(!running);
+}
+
+function startIfIdle() {
+  if (!running) setRunning(true);
 }
 
 function nextIntent() {
@@ -229,21 +277,20 @@ function nextIntent() {
 
   window.setTimeout(() => {
     intentEl.textContent = INTENTIONS[intentIndex];
+    fitIntentText();
+
     intentEl.classList.remove("fading");
 
     // restart pulse animation
     intentEl.classList.remove("pulse");
-    // force reflow so animation restarts reliably
-    void intentEl.offsetWidth;
+    void intentEl.offsetWidth; // force reflow
     intentEl.classList.add("pulse");
-
     window.setTimeout(() => intentEl.classList.remove("pulse"), 1300);
   }, 180);
 }
 
-startBtn.addEventListener("click", startSession);
-stopBtn.addEventListener("click", stopSession);
-circle.addEventListener("click", startSession);
+toggleBtn.addEventListener("click", toggleSession);
+circle.addEventListener("click", startIfIdle);
 intentEl.addEventListener("click", nextIntent);
 
 intentEl.addEventListener("keydown", (e) => {
@@ -253,7 +300,15 @@ intentEl.addEventListener("keydown", (e) => {
   }
 });
 
-</script>
+// Initial fit + respond to orientation / resize changes.
+window.addEventListener("load", fitIntentText);
+window.addEventListener("resize", () => {
+  // small delay so layout settles on iOS rotation
+  window.setTimeout(fitIntentText, 80);
+});
 
+// Start in idle state
+setRunning(false);
+fitIntentText();</script>
 </body>
 </html>
