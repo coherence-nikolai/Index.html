@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>Coherence</title>
+  <title>Field</title>
   <meta name="theme-color" content="#080f12">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%2378f0b1'/></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -93,16 +93,12 @@
       box-shadow:
         0 0 70px var(--accent-glow),
         inset 0 1px 0 rgba(255,255,255,.28);
-      transition:
-        transform 900ms var(--ease),
-        filter 600ms ease;
       cursor:pointer;
       user-select:none;
       position:relative;
+      transform:scale(1);
+      will-change: transform, filter;
     }
-
-    .circle.inhale{transform:scale(1.18); filter:brightness(1.10);}
-    .circle.exhale{transform:scale(.82); filter:brightness(.93);}
 
     .phase{
       position:absolute; inset:0;
@@ -295,13 +291,13 @@
 (() => {
   'use strict';
 
-  const IN = 5.5;
-  const HOLD = 0;
-  const OUT = 5.5;
+  // Single Field rhythm (coherence)
+  const CYCLE_SEC = 11.0; // 5.5 in + 5.5 out
+  const AMP = 0.22;       // big, obvious expansion (A)
 
   const KEY = {
-    durationMin: 'orion_duration_min_v1',
-    cueIdx: 'orion_cue_idx_v1'
+    durationMin: 'field_duration_min_v2',
+    cueIdx: 'field_cue_idx_v2'
   };
 
   const CUES = [
@@ -330,11 +326,13 @@
 
   let running = false;
   let totalRemaining = 0;
-  let phase = 'idle';
-  let phaseRemaining = 0;
   let tick = null;
+
   let cueIdx = 0;
   let durationMin = 5;
+
+  let rafId = null;
+  let startTs = 0;
 
   function haptic(ms=10){ try{ if (navigator.vibrate) navigator.vibrate(ms); }catch(e){} }
 
@@ -362,36 +360,39 @@
     }, 850);
   }
 
-  function setPhase(p, dur){
-    phase = p;
-    phaseRemaining = dur;
+  function startWave(){
+    if (rafId) return;
+    startTs = performance.now();
 
-    circle.classList.remove('inhale','exhale');
+    const step = (now) => {
+      if (!running) { rafId = null; return; }
 
-    if (p === 'in'){
-      circle.classList.add('inhale');
-      phaseText.textContent = 'inhale';
-    } else if (p === 'out'){
-      circle.classList.add('exhale');
-      phaseText.textContent = 'exhale';
-    } else {
-      phaseText.textContent = 'tap to begin';
-    }
-    haptic(6);
+      const t = (now - startTs) / 1000;
+      const phase = (t / CYCLE_SEC) * Math.PI * 2;
+
+      // Smooth wave: min -> max -> min with no edges
+      // scale = 1 - AMP*cos(phase) gives:
+      // phase 0: scale = 1-AMP (small), phase pi: scale = 1+AMP (large)
+      const scale = 1 - AMP * Math.cos(phase);
+      circle.style.transform = 'scale(' + scale.toFixed(4) + ')';
+
+      // Text: inhale while expanding (derivative positive)
+      const expanding = Math.sin(phase) >= 0;
+      phaseText.textContent = expanding ? 'inhale' : 'exhale';
+
+      rafId = requestAnimationFrame(step);
+    };
+
+    rafId = requestAnimationFrame(step);
   }
 
-  function advancePhase(){
-    if (phase === 'idle' || phase === 'out'){
-      setPhase('in', IN);
-    } else if (phase === 'in'){
-      if (HOLD > 0) {
-        setPhase('hold', HOLD);
-      } else {
-        setPhase('out', OUT);
-      }
-    } else if (phase === 'hold'){
-      setPhase('out', OUT);
+  function stopWave(){
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
     }
+    circle.style.transform = 'scale(1)';
+    phaseText.textContent = 'tap to begin';
   }
 
   function start(){
@@ -402,14 +403,10 @@
     startBtn.classList.add('running');
 
     fadeFieldOut();
-    advancePhase();
+    startWave();
 
     tick = setInterval(() => {
       totalRemaining -= 1;
-      phaseRemaining -= 1;
-
-      if (phaseRemaining <= 0) advancePhase();
-
       if (totalRemaining <= 0){
         stop(true);
       }
@@ -421,13 +418,10 @@
     clearInterval(tick);
     tick = null;
 
-    circle.classList.remove('inhale','exhale');
-    phase = 'idle';
-    phaseText.textContent = 'tap to begin';
-
     startBtn.textContent = 'Start';
     startBtn.classList.remove('running');
 
+    stopWave();
     showField();
 
     if (completed){
