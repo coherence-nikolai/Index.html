@@ -86,8 +86,22 @@ body.running h1.wordmark{
   color: #063a2b;
   box-shadow: 0 0 50px rgba(126,245,181,0.6);
   cursor: pointer;
-  transition: transform 1s ease-in-out;
+  transition: transform 1s ease-in-out, box-shadow 1s ease-in-out;
 }
+
+.circle.phase-inhale{
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 0 60px rgba(121,255,210,0.35),
+    0 0 140px rgba(121,255,210,0.18);
+}
+.circle.phase-exhale{
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 0 40px rgba(121,255,210,0.22),
+    0 0 110px rgba(121,255,210,0.12);
+}
+
 
 .circle.breathing {
   animation: breathe 11s ease-in-out infinite;
