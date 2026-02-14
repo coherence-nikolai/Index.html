@@ -242,20 +242,79 @@ button:hover{ filter: brightness(1.02); }
 (() => {
   'use strict';
 
+  // Language + Chile-tuned Spanish
+  let lang = 'en';
+  const TEXT = {
+    en: {
+      header: "field",
+      inhale: "INHALE",
+      exhale: "EXHALE",
+      start: "START",
+      stop: "STOP",
+      follow: "FOLLOW THE CIRCLE",
+      sub: "the field is shared.",
+      intentions: [
+        "Equanimity and awareness",
+        "Steady and open",
+        "Soft and spacious",
+        "Let it arrive",
+        "Nothing to fix",
+        "Here and now",
+        "Be the field",
+        "Rest in the field",
+        "Clear and kind"
+      ]
+    },
+    es: {
+      header: "campo",
+      inhale: "INHALA",
+      exhale: "EXHALA",
+      start: "COMENZAR",
+      stop: "DETENER",
+      follow: "SIGUE EL CÍRCULO",
+      sub: "el campo se comparte.",
+      intentions: [
+        "Calma y atención",
+        "Tranquilo y abierto",
+        "Suave y amplio",
+        "Deja que llegue",
+        "Nada que arreglar",
+        "Aquí y ahora",
+        "Sé el campo presente",
+        "Descansa en el campo",
+        "Claro y cariñoso"
+      ]
+    }
+  };
+
   // Breath timing (stabiliser default)
   const IN_SEC  = 5.5;
   const OUT_SEC = 5.5;
 
-  let intentions = [];
-
+  // DOM
   const app       = document.getElementById('app');
   const header    = document.getElementById('header');
   const circle    = document.getElementById('circle');
   const ripple    = document.getElementById('ripple');
   const toggleBtn = document.getElementById('toggleBtn');
   const intentEl  = document.getElementById('intent');
+  const subEl     = document.getElementById('sub');
 
+  const enBtn = document.getElementById('enBtn');
+  const esBtn = document.getElementById('esBtn');
+
+  
+  // Defensive: ensure required elements exist (prevents silent failures)
+  const REQUIRED = { app, header, circle, ripple, toggleBtn, intentEl, subEl, enBtn, esBtn };
+  const missing = Object.entries(REQUIRED).filter(([,v]) => !v).map(([k]) => k);
+  if (missing.length){
+    console.error("Field: missing DOM elements:", missing.join(", "));
+    return;
+  }
+
+// State
   let running = false;
+  let intentions = [];
   let intentIndex = 0;
   let firstCycleGuidance = true;
 
@@ -264,6 +323,49 @@ button:hover{ filter: brightness(1.02); }
   let phaseTimeoutB = null;
   let labelTimeoutA = null;
   let labelTimeoutB = null;
+
+  function renderHeaderWord(word){
+    header.innerHTML = '';
+    for (const ch of word){
+      const s = document.createElement('span');
+      s.textContent = ch;
+      header.appendChild(s);
+    }
+  }
+
+  function setLanguage(l){
+    lang = l;
+
+    // UI text
+    renderHeaderWord(TEXT[lang].header);
+    subEl.textContent = TEXT[lang].sub;
+
+    // Intentions
+    intentions = [...TEXT[lang].intentions];
+    intentIndex = 0;
+
+    // Always update the button label to match state
+    toggleBtn.textContent = running ? TEXT[lang].stop : TEXT[lang].start;
+
+    // If we're idle, update the visible prompt + first intention
+    if (!running){
+      intentEl.textContent = intentions[0];
+      circle.textContent = TEXT[lang].follow;
+      return;
+    }
+
+    // If we're mid-session and still guiding first cycle, keep the current label in-language
+    if (firstCycleGuidance){
+      // If circle currently shows a guidance label, swap it in-place.
+      const cur = (circle.textContent || '').trim().toUpperCase();
+      if (cur === TEXT.en.inhale || cur === TEXT.en.exhale || cur === TEXT.es.inhale || cur === TEXT.es.exhale){
+        // infer phase by current text
+        if (cur.includes('INH') || cur.includes('HAL')) circle.textContent = TEXT[lang].inhale;
+        else circle.textContent = TEXT[lang].exhale;
+      }
+    }
+  }
+  }
 
   function clearTimers(){
     if (phaseTimeoutA) { clearTimeout(phaseTimeoutA); phaseTimeoutA = null; }
@@ -361,10 +463,12 @@ button:hover{ filter: brightness(1.02); }
 
   function nextIntent(){
     if (running) return;
+    if (!intentions.length) return;
     intentIndex = (intentIndex + 1) % intentions.length;
     fadeIntentTo(intentions[intentIndex]);
   }
 
+  // Events
   toggleBtn.addEventListener('click', toggleSession);
   circle.addEventListener('click', () => { if (!running) startSession(); });
 
@@ -385,107 +489,23 @@ button:hover{ filter: brightness(1.02); }
     }
   });
 
-})();
+  enBtn.addEventListener('click', () => {
+    enBtn.classList.add('active');
+    esBtn.classList.remove('active');
+    setLanguage('en');
+  });
 
-let lang = 'en';
+  esBtn.addEventListener('click', () => {
+    esBtn.classList.add('active');
+    enBtn.classList.remove('active');
+    setLanguage('es');
+  });
 
-const enBtn = document.getElementById('enBtn');
-const esBtn = document.getElementById('esBtn');
-const subEl = document.getElementById('sub');
-
-const TEXT = {
-  en: {
-    header: "field",
-    inhale: "INHALE",
-    exhale: "EXHALE",
-    start: "START",
-    stop: "STOP",
-    follow: "FOLLOW THE CIRCLE",
-    sub: "the field is shared.",
-    intentions: [
-      "Equanimity and awareness",
-      "Steady and open",
-      "Soft and spacious",
-      "Let it arrive",
-      "Nothing to fix",
-      "Here, now",
-      "Be the field",
-      "Rest in the field",
-      "Clear and kind"
-    ]
-  },
-  es: {
-    header: "campo",
-    inhale: "INHALA",
-    exhale: "EXHALA",
-    start: "COMENZAR",
-    stop: "DETENER",
-    follow: "SIGUE EL CÍRCULO",
-    sub: "el campo se comparte.",
-    intentions: [
-      "Calma y atención",
-      "Tranquilo y abierto",
-      "Suave y amplio",
-      "Deja que llegue",
-      "Nada que arreglar",
-      "Aquí y ahora",
-      "Sé el campo presente",
-      "Descansa en el campo",
-      "Claro y cariñoso"
-    ]
-  }
-};
-
-function renderHeaderWord(word){
-  header.innerHTML = '';
-  for (const ch of word){
-    const s = document.createElement('span');
-    s.textContent = ch;
-    header.appendChild(s);
-  }
-}
-
-function setLanguage(l){
-  lang = l;
-
-  renderHeaderWord(TEXT[lang].header);
-  subEl.textContent = TEXT[lang].sub;
-
-  intentions = [...TEXT[lang].intentions];
-  intentIndex = 0;
-  // Only update visible text if we're not in a running session
-  if (!running){
-    intentEl.textContent = intentions[0];
-    circle.textContent = TEXT[lang].follow;
-    toggleBtn.textContent = TEXT[lang].start;
-  }
-}
-
-enBtn.addEventListener('click', () => {
+  // Init
   enBtn.classList.add('active');
-  esBtn.classList.remove('active');
   setLanguage('en');
-});
 
-esBtn.addEventListener('click', () => {
-  esBtn.classList.add('active');
-  enBtn.classList.remove('active');
-  setLanguage('es');
-});
-
-enBtn.classList.add('active');
-setLanguage('en');
-};
-
-document.getElementById('esBtn').onclick = () => {
-  esBtn.classList.add('active');
-  enBtn.classList.remove('active');
-  setLanguage('es');
-};
-
-enBtn.classList.add('active');
-setLanguage('en');
-
+})();
 </script>
 </body>
 </html>
