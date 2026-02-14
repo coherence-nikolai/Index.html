@@ -55,6 +55,19 @@ body{
   color: var(--header);
   transition: opacity 900ms ease;
 }
+
+  .header--phrase{
+    width: auto;
+    max-width: min(92vw, 520px);
+    justify-content: center !important;
+    gap: 0 !important;
+    letter-spacing: 0.12em;
+  }
+  .header--phrase span{
+    white-space: nowrap;
+    font-size: clamp(34px, 7.2vw, 64px);
+    line-height: 1;
+  }
 .header span{
   display:inline-block;
   line-height:1;
@@ -266,7 +279,7 @@ button:hover{ filter: brightness(1.02); }
       ]
     },
     es: {
-      header: "campo",
+      header: "campo de presencia",
       inhale: "INHALA",
       exhale: "EXHALA",
       start: "COMENZAR",
@@ -326,6 +339,18 @@ button:hover{ filter: brightness(1.02); }
 
   function renderHeaderWord(word){
     header.innerHTML = '';
+
+    // If the header contains spaces (e.g., Spanish phrase), render as a single line
+    // and let CSS handle sizing/tracking, so it never "stretches" awkwardly.
+    if (word.includes(' ')) {
+      header.classList.add('header--phrase');
+      const s = document.createElement('span');
+      s.textContent = word;
+      header.appendChild(s);
+      return;
+    }
+
+    header.classList.remove('header--phrase');
     for (const ch of word){
       const s = document.createElement('span');
       s.textContent = ch;
@@ -335,6 +360,7 @@ button:hover{ filter: brightness(1.02); }
 
   function setLanguage(l){
     lang = l;
+    document.body.classList.toggle("lang-es", lang === "es");
 
     // UI text
     renderHeaderWord(TEXT[lang].header);
